@@ -24,6 +24,8 @@ var (
 	readFunc      ReadFunc = makeReadFunc("locale")
 	defaultLocale string   = "en_US"
 	defaultLang   string   = "en"
+	currentLocale string   = defaultLocale
+	currentLang   string   = defaultLang
 	trMutex       sync.RWMutex
 	// read from a nil map is ok, so leave it uninitialized here
 	trMap map[string]string
@@ -65,11 +67,7 @@ func makeReadFunc(d string) ReadFunc {
 			err = fmt.Errorf("Error open file %s: %s", fileName, err)
 			return
 		}
-		defer func() {
-			if err := f.Close(); err != nil {
-				log.Debugf("Unable to close file: %v", err)
-			}
-		}()
+		defer f.Close()
 		if buf, err = ioutil.ReadAll(f); err != nil {
 			err = fmt.Errorf("Error read file %s: %s", fileName, err)
 		}
@@ -99,15 +97,15 @@ func SetLocale(locale string) error {
 	if matched, _ := regexp.MatchString(localeRegexp, locale); !matched {
 		return fmt.Errorf("Malformated locale string %s", locale)
 	}
-	locale = strings.Replace(locale, "-", "_", -1)
+	currentLocale = strings.Replace(locale, "-", "_", -1)
 	parts := strings.Split(locale, "_")
-	lang := parts[0]
+	currentLang = parts[0]
 	log.Debugf("Setting locale %v", locale)
 	newTrMap := make(map[string]string)
 	mergeLocaleToMap(newTrMap, defaultLang)
 	mergeLocaleToMap(newTrMap, defaultLocale)
-	mergeLocaleToMap(newTrMap, lang)
-	mergeLocaleToMap(newTrMap, locale)
+	mergeLocaleToMap(newTrMap, currentLang)
+	mergeLocaleToMap(newTrMap, currentLocale)
 	if len(newTrMap) == 0 {
 		return fmt.Errorf("Not found any translations, locale not set")
 	}
@@ -116,6 +114,11 @@ func SetLocale(locale string) error {
 	defer trMutex.Unlock()
 	trMap = newTrMap
 	return nil
+}
+
+// CurrentLocale returns the current locale
+func CurrentLocale() string {
+	return currentLocale
 }
 
 func mergeLocaleToMap(dst map[string]string, locale string) {
